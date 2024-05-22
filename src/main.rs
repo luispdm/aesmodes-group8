@@ -95,12 +95,31 @@ fn group(data: Vec<u8>) -> Vec<[u8; BLOCK_SIZE]> {
 
 /// Does the opposite of the group function
 fn un_group(blocks: Vec<[u8; BLOCK_SIZE]>) -> Vec<u8> {
-	todo!()
+	let mut data = Vec::with_capacity(blocks.len() * BLOCK_SIZE);
+    for block in blocks {
+        data.extend_from_slice(&block);
+    }
+    data
 }
 
 /// Does the opposite of the pad function.
 fn un_pad(data: Vec<u8>) -> Vec<u8> {
-	todo!()
+	if data.is_empty() {
+        return data;
+    }
+
+    let data_len = data.len();
+    let pad_byte = data[data_len - 1] as usize;
+
+    if pad_byte <= data_len
+        && data[data_len - pad_byte..]
+            .iter()
+            .all(|&byte| byte as usize == pad_byte)
+    {
+        return data[0..data_len - pad_byte].to_vec();
+    }
+
+    data
 }
 
 /// The first mode we will implement is the Electronic Code Book, or ECB mode.
@@ -111,12 +130,35 @@ fn un_pad(data: Vec<u8>) -> Vec<u8> {
 /// One good thing about this mode is that it is parallelizable. But to see why it is
 /// insecure look at: https://www.ubiqsecurity.com/wp-content/uploads/2022/02/ECB2.png
 fn ecb_encrypt(plain_text: Vec<u8>, key: [u8; 16]) -> Vec<u8> {
-	todo!()
+	let blocks = match plain_text.len() % BLOCK_SIZE {
+        0 => group(plain_text),
+        _ => group(pad(plain_text))
+    };
+
+    let mut encrypted_blocks: Vec<[u8; BLOCK_SIZE]> = vec![];
+    for b in blocks {
+        encrypted_blocks.push(aes_encrypt(b, &key));
+    }
+
+    let mut ciphertext = Vec::with_capacity(encrypted_blocks.len() * BLOCK_SIZE);
+    for b in encrypted_blocks {
+        ciphertext.extend_from_slice(&b);
+    }
+
+    ciphertext
 }
 
 /// Opposite of ecb_encrypt.
 fn ecb_decrypt(cipher_text: Vec<u8>, key: [u8; BLOCK_SIZE]) -> Vec<u8> {
-	todo!()
+	let blocks = group(cipher_text);
+
+    let mut decrypted_blocks: Vec<[u8; BLOCK_SIZE]> = vec![];
+    for b in blocks {
+        decrypted_blocks.push(aes_decrypt(b, &key))
+    }
+
+    let decrypted_data = un_group(decrypted_blocks);
+    un_pad(decrypted_data)
 }
 
 /// The next mode, which you can implement on your own is cipherblock chaining.
