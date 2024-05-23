@@ -182,7 +182,7 @@ fn cbc_encrypt(plain_text: Vec<u8>, key: [u8; BLOCK_SIZE]) -> Vec<u8> {
         _ => group(pad(plain_text))
     };
 	let mut encrypted_blocks: Vec<[u8; BLOCK_SIZE]> = vec![];
-	let mut prev_block_cipher = random_iv.clone();
+	let mut prev_block_cipher = random_iv;
 	for block in blocks{
 
 		let interim_vec: Vec<u8> = block
@@ -219,7 +219,7 @@ fn cbc_decrypt(cipher_text: Vec<u8>, key: [u8; BLOCK_SIZE]) -> Vec<u8> {
 							.zip(prev_block_cipher.iter())
 							.map(|(&x1, &x2)| x1 ^ x2)
 							.collect();
-		prev_block_cipher = block.clone();
+		prev_block_cipher = block;
 
 		let mut input: [u8; BLOCK_SIZE] = [0; BLOCK_SIZE];
 		input.copy_from_slice(&interim_vec);
@@ -256,3 +256,61 @@ fn ctr_encrypt(plain_text: Vec<u8>, key: [u8; BLOCK_SIZE]) -> Vec<u8> {
 fn ctr_decrypt(cipher_text: Vec<u8>, key: [u8; BLOCK_SIZE]) -> Vec<u8> {
 	todo!()
 }
+
+// ------------------ alternative cbc implementations with nested for loops: ------------------
+// fn cbc_encrypt(plain_text: Vec<u8>, key: [u8; BLOCK_SIZE]) -> Vec<u8> {
+//     let mut rng = rand::thread_rng();
+//     let mut iv: [u8; BLOCK_SIZE] = [0; BLOCK_SIZE];
+//     rng.fill(&mut iv);
+
+//     let blocks = match plain_text.len() % BLOCK_SIZE {
+//         0 => group(plain_text),
+//         _ => group(pad(plain_text)),
+//     };
+
+//     let mut encrypted_blocks: Vec<[u8; BLOCK_SIZE]> = Vec::with_capacity(blocks.len());
+//     let mut prev_cipher_block = iv;
+
+//     for block in blocks {
+//         let mut xored_block: [u8; BLOCK_SIZE] = [0; BLOCK_SIZE];
+//         for i in 0..BLOCK_SIZE {
+//             xored_block[i] = block[i] ^ prev_cipher_block[i];
+//         }
+
+//         let encrypted_block = aes_encrypt(xored_block, &key);
+//         encrypted_blocks.push(encrypted_block);
+
+//         prev_cipher_block = encrypted_block;
+//     }
+
+//     let mut ciphertext = Vec::with_capacity((encrypted_blocks.len() + 1) * BLOCK_SIZE);
+//     ciphertext.extend_from_slice(&iv);
+//     for block in encrypted_blocks {
+//         ciphertext.extend_from_slice(&block);
+//     }
+
+//     ciphertext
+// }
+
+// fn cbc_decrypt(cipher_text: Vec<u8>, key: [u8; BLOCK_SIZE]) -> Vec<u8> {
+//     let (iv, ciphertext_blocks) = cipher_text.split_at(BLOCK_SIZE);
+//     let blocks = group(ciphertext_blocks.to_vec());
+
+//     let mut decrypted_blocks: Vec<[u8; BLOCK_SIZE]> = Vec::with_capacity(blocks.len());
+//     let mut prev_cipher_block = iv.to_vec();
+
+//     for block in blocks {
+//         let decrypted_block = aes_decrypt(block, &key);
+
+//         let mut xor_block: [u8; BLOCK_SIZE] = [0; BLOCK_SIZE];
+//         for i in 0..BLOCK_SIZE {
+//             xor_block[i] = decrypted_block[i] ^ prev_cipher_block[i];
+//         }
+
+//         decrypted_blocks.push(xor_block);
+//         prev_cipher_block = block.to_vec();
+//     }
+
+//     let decrypted_data = un_group(decrypted_blocks);
+//     un_pad(decrypted_data)
+// }
