@@ -232,6 +232,17 @@ fn cbc_decrypt(cipher_text: Vec<u8>, key: [u8; BLOCK_SIZE]) -> Vec<u8> {
     un_pad(decrypted_data)
 }
 
+fn increment_counter(counter: &mut [u8; 8]) {
+    for i in 0..8 {
+        if counter[i] == u8::MAX {
+            counter[i] = 0;
+        } else {
+            counter[i] += 1;
+            break;
+        }
+    }
+}
+
 /// Another mode which you can implement on your own is counter mode.
 /// This mode is secure as well, and is used in real world applications.
 /// It allows parallelized encryption and decryption, as well as random read access when decrypting.
@@ -249,12 +260,63 @@ fn cbc_decrypt(cipher_text: Vec<u8>, key: [u8; BLOCK_SIZE]) -> Vec<u8> {
 /// Once again, you will need to generate a random nonce which is 64 bits long. This should be
 /// inserted as the first block of the ciphertext.
 fn ctr_encrypt(plain_text: Vec<u8>, key: [u8; BLOCK_SIZE]) -> Vec<u8> {
-	// Remember to generate a random nonce
-	todo!()
+	let random_nonce: [u8; 8] = rand::random();
+    let mut counter: [u8; 8] = [0; 8];
+    let mut encrypted_blocks: Vec<u8> = vec![];
+
+    // Add the IV to the encrypted blocks so it can be used when decrypting
+    encrypted_blocks.extend([random_nonce].iter().cloned().flatten());
+
+    let blocks = match plain_text.len() % BLOCK_SIZE {
+        0 => group(plain_text),
+        _ => group(pad(plain_text)),
+    };
+
+    for block in blocks {
+        let mut randomized_vector: [u8; 16] = [0; 16];
+        randomized_vector[..8].copy_from_slice(&random_nonce);
+        randomized_vector[8..].copy_from_slice(&counter);
+
+        let encrypted_v = aes_encrypt(randomized_vector, &key);
+        let interim_vec: Vec<u8> = block
+            .iter()
+            .zip(encrypted_v.iter())
+            .map(|(&x1, &x2)| x1 ^ x2)
+            .collect();
+        encrypted_blocks.extend(interim_vec);
+        increment_counter(&mut counter);
+    }
+    encrypted_blocks
 }
 
 fn ctr_decrypt(cipher_text: Vec<u8>, key: [u8; BLOCK_SIZE]) -> Vec<u8> {
-	todo!()
+	    // Check if the ciphertext contains the nonce
+		if cipher_text.len() < 16 {
+			return vec![];
+		}
+		let (random_nonce, actual_cipher_text) = cipher_text.split_at(8);
+		let random_nonce: [u8; 8] = random_nonce[..8].try_into().unwrap();
+		let mut counter: [u8; 8] = [0; 8];
+	
+		let blocks = group(actual_cipher_text.to_vec()).into_iter();
+		let mut decrypted_blocks: Vec<[u8; BLOCK_SIZE]> = vec![];
+	
+		for block in blocks {
+			let mut randomized_vector: [u8; 16] = [0; 16];
+			randomized_vector[..8].copy_from_slice(&random_nonce);
+			randomized_vector[8..].copy_from_slice(&counter);
+			let encrypted_v = aes_encrypt(randomized_vector, &key);
+			let interim_vec: Vec<u8> = block
+				.iter()
+				.zip(encrypted_v.iter())
+				.map(|(&x1, &x2)| x1 ^ x2)
+				.collect();
+	
+			decrypted_blocks.push(interim_vec.try_into().unwrap());
+			increment_counter(&mut counter);
+		}
+		let decrypted_data = un_group(decrypted_blocks);
+		un_pad(decrypted_data)
 }
 
 // ------------------ alternative cbc implementations with nested for loops: ------------------
