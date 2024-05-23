@@ -15,6 +15,7 @@ use aes::{
 	cipher::{generic_array::GenericArray, BlockCipher, BlockDecrypt, BlockEncrypt, KeyInit},
 	Aes128,
 };
+use rand::prelude::*;
 
 ///We're using AES 128 which has 16-byte (128 bit) blocks.
 const BLOCK_SIZE: usize = 16;
@@ -175,12 +176,60 @@ fn ecb_decrypt(cipher_text: Vec<u8>, key: [u8; BLOCK_SIZE]) -> Vec<u8> {
 /// is inserted as the first block of ciphertext.
 fn cbc_encrypt(plain_text: Vec<u8>, key: [u8; BLOCK_SIZE]) -> Vec<u8> {
 	// Remember to generate a random initialization vector for the first block.
+	let random_iv: [u8; BLOCK_SIZE] = rand::random();
+	let blocks = match plain_text.len() % BLOCK_SIZE {
+        0 => group(plain_text),
+        _ => group(pad(plain_text))
+    };
+	let mut encrypted_blocks: Vec<[u8; BLOCK_SIZE]> = vec![];
+	let mut prev_block_cipher = random_iv.clone();
+	for block in blocks{
 
-	todo!()
+		let interim_vec: Vec<u8> = block
+						.iter()
+						.zip(prev_block_cipher.iter())
+						.map(|(&x1, &x2)| x1 ^ x2)
+						.collect();
+		let mut input: [u8; BLOCK_SIZE] = [0; BLOCK_SIZE];
+		input.copy_from_slice(&interim_vec);
+		
+		prev_block_cipher = aes_encrypt(input, &key);
+		encrypted_blocks.push(prev_block_cipher);
+	}
+
+	let mut ciphertext = Vec::with_capacity(encrypted_blocks.len() * BLOCK_SIZE + 1);
+	ciphertext.extend_from_slice(&random_iv);
+    for b in encrypted_blocks {
+        ciphertext.extend_from_slice(&b);
+    }
+
+    ciphertext
 }
 
 fn cbc_decrypt(cipher_text: Vec<u8>, key: [u8; BLOCK_SIZE]) -> Vec<u8> {
-	todo!()
+	let mut blocks = group(cipher_text).into_iter();
+
+    let mut decrypted_blocks: Vec<[u8; BLOCK_SIZE]> = vec![];
+	// add test for empty case
+	let mut prev_block_cipher: [u8; BLOCK_SIZE] = blocks.next().unwrap();
+    for block in blocks{
+		let curr_block = aes_decrypt(block, &key);
+		let interim_vec: Vec<u8> = curr_block
+							.iter()
+							.zip(prev_block_cipher.iter())
+							.map(|(&x1, &x2)| x1 ^ x2)
+							.collect();
+		prev_block_cipher = block.clone();
+
+		let mut input: [u8; BLOCK_SIZE] = [0; BLOCK_SIZE];
+		input.copy_from_slice(&interim_vec);
+
+
+        decrypted_blocks.push(input);
+    }
+
+    let decrypted_data = un_group(decrypted_blocks);
+    un_pad(decrypted_data)
 }
 
 /// Another mode which you can implement on your own is counter mode.
