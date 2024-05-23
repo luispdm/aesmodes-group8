@@ -131,10 +131,7 @@ fn un_pad(data: Vec<u8>) -> Vec<u8> {
 /// One good thing about this mode is that it is parallelizable. But to see why it is
 /// insecure look at: https://www.ubiqsecurity.com/wp-content/uploads/2022/02/ECB2.png
 fn ecb_encrypt(plain_text: Vec<u8>, key: [u8; 16]) -> Vec<u8> {
-    let blocks = match plain_text.len() % BLOCK_SIZE {
-        0 => group(plain_text),
-        _ => group(pad(plain_text)),
-    };
+    let blocks = group(pad(plain_text));
 
     let mut encrypted_blocks: Vec<[u8; BLOCK_SIZE]> = vec![];
     for b in blocks {
@@ -177,10 +174,7 @@ fn ecb_decrypt(cipher_text: Vec<u8>, key: [u8; BLOCK_SIZE]) -> Vec<u8> {
 fn cbc_encrypt(plain_text: Vec<u8>, key: [u8; BLOCK_SIZE]) -> Vec<u8> {
     // Remember to generate a random initialization vector for the first block.
     let random_iv: [u8; BLOCK_SIZE] = rand::random();
-    let blocks = match plain_text.len() % BLOCK_SIZE {
-        0 => group(plain_text),
-        _ => group(pad(plain_text)),
-    };
+    let blocks = group(pad(plain_text));
     let mut encrypted_blocks: Vec<[u8; BLOCK_SIZE]> = vec![];
     let mut prev_block_cipher = random_iv;
     for block in blocks {
@@ -264,10 +258,7 @@ fn ctr_encrypt(plain_text: Vec<u8>, key: [u8; BLOCK_SIZE]) -> Vec<u8> {
     // Add the IV to the encrypted blocks so it can be used when decrypting
     encrypted_blocks.extend([random_nonce].iter().cloned().flatten());
 
-    let blocks = match plain_text.len() % BLOCK_SIZE {
-        0 => group(plain_text),
-        _ => group(pad(plain_text)),
-    };
+    let blocks = group(pad(plain_text));
 
     for block in blocks {
         let mut randomized_vector: [u8; 16] = [0; 16];
